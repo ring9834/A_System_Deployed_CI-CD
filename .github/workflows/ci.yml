@@ -22,18 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up .NET
-        if: ${{ hashFiles('api/*.sln', 'api/*.slnx') != '' }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.401   # match your SDK; check with `dotnet --version`
       - name: Restore
-        if: ${{ hashFiles('api/*.sln', 'api/*.slnx') != '' }}
         run: dotnet restore
       - name: Build
-        if: ${{ hashFiles('api/*.sln', 'api/*.slnx') != '' }}
         run: dotnet build --no-restore -c Release
       - name: Test
-        if: ${{ hashFiles('api/*.sln', 'api/*.slnx') != '' }}
         run: dotnet test --no-build -c Release
 
   web:
@@ -45,20 +41,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node
-        if: ${{ hashFiles('web/package-lock.json') != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Install
-        if: ${{ hashFiles('web/package-lock.json') != '' }}
         run: npm ci
       - name: Lint
-        if: ${{ hashFiles('web/package-lock.json') != '' }}
         run: npm run lint
       - name: Build
-        if: ${{ hashFiles('web/package-lock.json') != '' }}
         run: npm run build
 
   # Added in later steps:
