@@ -31,6 +31,7 @@ and every `partial` or `deferred` row needs a one-line reason. Update this file 
 | Deployability | Deploy with `helm upgrade --atomic` + smoke test | todo | | |
 | Deployability | Rollback drill performed | todo | | |
 | Deployability | Terraform remote state, no long-lived cloud secrets in CI (OIDC) | todo | | |
+| Deployability | Static asset cache-control headers/CDN | todo | | |
 | Data | Managed PostgreSQL with backups | todo | | |
 | Data | Migrations tested; indexes match query patterns | todo | | |
 | Maintainability | OpenAPI contract in repo; client types generated | todo | | |
