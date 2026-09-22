@@ -57,6 +57,7 @@ the right direction.
 | CSR via Next.js for all authenticated views; no SSR | Consistency with ADR-0002 (auth transport) | [0012](adr/0012-frontend-rendering-strategy.md) |
 | TanStack Query for server state; React state/Context for UI; no Redux | Q5 (modifiability), right-sized | [0013](adr/0013-frontend-state-management.md) |
 | AKS, not ACA/ACI/App Service for Containers | Compliance with the brief's explicit Kubernetes+Helm requirement | [0014](adr/0014-container-hosting-platform.md) |
+| CQRS rejected; staged read-scaling ladder (index -> cache -> read replica -> CQRS) with explicit triggers | Evidence-based scalability, right-sized | [0015](adr/0015-cqrs-and-read-scaling.md) |
 
 ## ATAM-lite: risks, sensitivity points, trade-offs
 | # | Type | Item | Detail | Disposition |
