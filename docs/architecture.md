@@ -56,6 +56,7 @@ the right direction.
 | No caching for MVP; Redis if/when triggered | Q7 (consistent across replicas), right-sized | [0011](adr/0011-caching-strategy.md) |
 | CSR via Next.js for all authenticated views; no SSR | Consistency with ADR-0002 (auth transport) | [0012](adr/0012-frontend-rendering-strategy.md) |
 | TanStack Query for server state; React state/Context for UI; no Redux | Q5 (modifiability), right-sized | [0013](adr/0013-frontend-state-management.md) |
+| AKS, not ACA/ACI/App Service for Containers | Compliance with the brief's explicit Kubernetes+Helm requirement | [0014](adr/0014-container-hosting-platform.md) |
 
 ## ATAM-lite: risks, sensitivity points, trade-offs
 | # | Type | Item | Detail | Disposition |
@@ -67,4 +68,5 @@ the right direction.
 | S3 | Sensitivity point | Security is prioritised H/H despite a "toy" domain | Location data is a customer's physical address, not abstract data; owner-isolation is cheap to build in now, expensive to retrofit once queries assume single-tenant | Built into MVP scope (Q1), not deferred |
 | T1 | Trade-off | Modular monolith vs microservices | Gains: simplicity, one deploy unit, easy transactions. Costs: no independent scaling of parts (acceptable — todo API has no part that needs it) | Modular monolith chosen (ADR-0001) |
 | T2 | Trade-off | Kubernetes Secrets (MVP) vs Key Vault CSI driver | Gains: less setup time now. Costs: secrets live in etcd, less rotation-friendly | Accepted for MVP; CSI driver listed as deferred, not silently skipped |
+| T3 | Trade-off | AKS's operational overhead vs the app's actual size | Gains: satisfies the brief's explicit Kubernetes/Helm requirement. Costs: cluster lifecycle, node management, and networking overhead a todo CRUD API would not organically need — ACA or App Service would be a better-fitted choice on merits alone | Accepted as a compliance cost, not claimed as the "correct" architecture; mitigated by right-sizing everything within AKS (minimal node pool, no service mesh, no unneeded add-ons) |
 | N1 | Non-risk | Stateless API impacting horizontal scaling | ASP.NET Core with no in-process session state is close to framework default; low implementation risk | Confirmed via ADR-0002 + `StatelessApiTests` |
