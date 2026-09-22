@@ -11,7 +11,7 @@ is written down before implementation, not invented afterwards.
 | A3 | Legal state transitions? | `todo -> scheduled -> done`, plus `scheduled -> todo` (unschedule). No transition out of `done`. | Simplest model that supports the domain story; defensible live |
 | A4 | Single-user or multi-user? | Multi-user from day one; every todo has `OwnerId` | Cheap now, expensive to retrofit; creates a real security scenario (Q1) |
 | A5 | Mobile or web UI? | Web (Next.js) | Matches chosen stack; brief allows either |
-| A6 | Who issues the JWT? | Self-issued for the assessment (minimal `/auth/login` or seeded dev user), not a full IdP | Full OIDC integration is disproportionate to the time box; logged as deferred |
+| A6 | Is a full identity provider in scope? | No — full OIDC/IdP integration is out of scope for the assessment; some lighter form of authentication is required (per A4, multi-user) and the mechanism is decided in [ADR-0007](adr/0007-authentication-mechanism.md), not assumed here | Standing up or integrating a real IdP is disproportionate setup cost for this time box; which mechanism to use instead is an architecture decision, not a requirements assumption |
 | A7 | Offline support? | Out of scope | Not implied by the brief; adds complexity with no stated benefit |
 
 ## 2. Backlog with a cut line
@@ -20,14 +20,14 @@ Reasoned prioritisation of an intentionally oversized brief.
 ### Built (MVP)
 - Create / list / update / delete todo (title, state, location) — brief's explicit CRUD core
 - State machine enforcing legal transitions (A3) — smallest thing that shows real domain logic
-- Owner isolation via JWT (A4, A6) — highest-value, lowest-cost security story
+- Owner-scoped access control (A4, A6; mechanism decided in [ADR-0007](adr/0007-authentication-mechanism.md)) — highest-value, lowest-cost security story
 - Pagination + filter by state on list endpoint — realistic API behaviour
 - Deployed to Kubernetes via Helm, provisioned by Terraform — infra requirement, end to end
 - CI pipeline: build, test, lint, scan — core evidence for "production-ready"
 
 ### Deferred (documented, would do next)
 - Geocoding / map view of location — enhancement, not required by the brief
-- Full OIDC identity provider — self-issued JWT proves the pattern at lower cost
+- Full third-party identity provider — a lighter, self-issued mechanism (ADR-0007) proves the pattern at lower cost
 - Observability beyond basic health/logs (metrics, tracing) — valuable, low interview signal
 - HPA / autoscaling — real concern, low signal at todo-app scale
 - Distributed caching (e.g. Redis) for frequently-requested, relatively stable data — valuable once traffic/instances grow; only pays off once the API is already stateless and running across multiple instances, so it's a pure addition later rather than a prerequisite now
