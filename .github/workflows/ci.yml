@@ -84,6 +84,9 @@ jobs:
           docker push rushtododevacr.azurecr.io/todo-web:${{ github.sha }}
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # required by actions/checkout
+      pull-requests: read # required by dorny/paths-filter
     outputs:
       infra: ${{ steps.filter.outputs.infra }}
     steps:
