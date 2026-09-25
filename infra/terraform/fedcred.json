@@ -1,0 +1,1 @@
+﻿{"name":"github-main-branch","issuer":"https://token.actions.githubusercontent.com","subject":"repo:ring9834/TodoManage:ref:refs/heads/main","audiences":["api://AzureADTokenExchange"]}

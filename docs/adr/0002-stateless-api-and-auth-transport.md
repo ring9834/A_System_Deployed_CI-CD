@@ -19,7 +19,7 @@ per-request. The brief's stack is Next.js (browser SPA) talking to a separate .N
 
 ## Decision
 Option 2. JWT lives in an httpOnly cookie set by the API. Ingress routes `/api/*` to the
-backend and `/` to the frontend under one host, so the cookie is same-origin and no CORS
+backend (strip the /api prefix so the API's own routes stay clean (/health, not /api/health) by rewriting at the ingress) and `/` to the frontend under one host, so the cookie is same-origin and no CORS
 configuration is needed for the browser-to-API path.
 
 ## Consequences
