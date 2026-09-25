@@ -57,3 +57,28 @@ jobs:
   #   - image build + Trivy scan (Step 4/6)
   #   - terraform fmt/validate, helm lint + kubeconform (Step 6)
   #   - deploy to dev with helm --atomic + smoke test (Step 6)
+
+  build-and-push:
+    needs: [api, web]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: ACR login
+        run: az acr login --name rushtododevacr
+      - name: Build and push API image
+        run: |
+          docker build -t rushtododevacr.azurecr.io/todo-api:${{ github.sha }} api/
+          docker push rushtododevacr.azurecr.io/todo-api:${{ github.sha }}
+      - name: Build and push web image
+        run: |
+          docker build -t rushtododevacr.azurecr.io/todo-web:${{ github.sha }} web/
+          docker push rushtododevacr.azurecr.io/todo-web:${{ github.sha }}
