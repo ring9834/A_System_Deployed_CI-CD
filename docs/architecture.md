@@ -8,15 +8,47 @@
 - **Chosen within those constraints, now justified (see ADR-0006):** React web (not RN/Flutter), .NET/C# with controllers, Azure (not AWS).
 - **Decisions the brief leaves fully open, each with alternatives considered:** layering (ADR-0003), authentication mechanism (ADR-0007) and its transport (ADR-0002), database engine (ADR-0008), migrations strategy (ADR-0004), secrets (ADR-0005), API gateway/ingress layer (ADR-0009), asynchronous processing (ADR-0010), caching (ADR-0011).
 
+## System boundary: current and future external touchpoints
+Applying an inside-vs-outside-the-system lens (what does the *running* application send to
+or receive from something it doesn't own/deploy) rather than analyzing this as a new decision
+— every touchpoint below already has a decision and trigger recorded elsewhere; this section
+exists to show them as one consolidated boundary, since no other single artefact does.
+
+**Inside the boundary** (owned, deployed by this project's own Terraform/Helm): the web app,
+the API, PostgreSQL. This includes Postgres — it's a separate resource, but not external.
+
+**Outside the boundary today: none.** The full runtime request path (browser -> web -> API ->
+Postgres) is entirely first-party. No external API keys, no third-party rate limits, no
+data-residency questions, no external-outage risk exist in the current MVP scope — a
+deliberate, notable property of the design, not an oversight.
+
+**Outside the boundary, if/when triggered (already decided elsewhere, not new):**
+| Touchpoint | Direction | Trigger |
+|---|---|---|
+| Geocoding API | External data source (address -> lat/lng) | Backlog item built (deferred, A1) |
+| Real OIDC identity provider | External data source (delegated identity) | A6 / ADR-0007's deferred full-IdP path |
+| Observability backend | External data sink (logs/metrics/traces leave the system) | ADR-0018's dashboard/alerting trigger |
+
+**Explicitly out of scope for this analysis:** build-time dependencies (Terraform registry,
+ACR image pulls, GitHub Actions calling Azure) are a different category — toolchain
+dependencies, not the running application's data flow — and are not diagrammed here.
+
 ## C4 — Context
 ```mermaid
 C4Context
   Person(user, "Gardener (user)", "Creates and manages todos with a location")
-  System(app, "Todo Planner", "Tracks todo items with state and location")
-  System_Ext(azuredb, "Azure Database for PostgreSQL", "Managed data store")
+  System(app, "Todo Planner", "Tracks todo items with state and location — fully self-contained in MVP scope")
+  System_Ext(geocode, "Geocoding API", "Deferred — address to lat/lng (see backlog, A1)")
+  System_Ext(idp, "Identity Provider", "Deferred — real OIDC/IdP (see A6, ADR-0007)")
+  System_Ext(obs, "Observability backend", "Deferred — logs/metrics/traces sink (see ADR-0018)")
   Rel(user, app, "Uses", "HTTPS")
-  Rel(app, azuredb, "Reads/writes", "TCP/TLS")
+  Rel(app, geocode, "Would call (not built)", "HTTPS")
+  Rel(idp, app, "Would issue tokens (not built)", "OIDC")
+  Rel(app, obs, "Would export (not built)", "OTLP")
 ```
+Note: PostgreSQL is deliberately **not** shown as an external system in this diagram — it is
+owned and deployed by this project's own Terraform, inside the boundary. See the Container
+diagram below for where it actually sits.
 
 ## C4 — Container
 ```mermaid
@@ -58,6 +90,14 @@ the right direction.
 | TanStack Query for server state; React state/Context for UI; no Redux | Q5 (modifiability), right-sized | [0013](adr/0013-frontend-state-management.md) |
 | AKS, not ACA/ACI/App Service for Containers | Compliance with the brief's explicit Kubernetes+Helm requirement | [0014](adr/0014-container-hosting-platform.md) |
 | CQRS rejected; staged read-scaling ladder (index -> cache -> read replica -> CQRS) with explicit triggers | Evidence-based scalability, right-sized | [0015](adr/0015-cqrs-and-read-scaling.md) |
+| No repository layer over EF Core; Testcontainers for integration tests; real auth in tests; narrow IClock port; MSW deferred | Q8-Q11, right-sized testability | [0016](adr/0016-testability-strategy.md) |
+| Mobile portability via responsive web design; no native/RN/Flutter app | Q12, right-sized (offline/native-API/App-Store needs all absent) | [0017](adr/0017-mobile-portability.md) |
+| Observability: instrument now with OpenTelemetry (vendor-neutral); defer backend/exporter choice | Q13, cheap-now/expensive-to-retrofit | [0018](adr/0018-observability-strategy.md) |
+| CI/CD platform: GitHub Actions, not Azure Pipelines/Jenkins/GitLab CI | Open choice, not brief-mandated; avoids a second platform GitHub Actions' OIDC-to-Azure already makes unnecessary | [0019](adr/0019-cicd-platform.md) |
+| Environment strategy: local + one cloud "dev" environment; no separate test/staging/prod | Three of four classic reasons for separation don't apply (solo, no real users); real quota scarcity already experienced | [0020](adr/0020-environment-strategy.md) |
+| Release strategy: Kubernetes rolling update via `helm --atomic`; no blue/green or canary | Canary's prerequisite (real traffic) absent; blue/green's cost contradicts ADR-0014 for a risk with no real users to affect | [0021](adr/0021-release-strategy.md) |
+| Communication protocol: HTTP/REST (JSON), not gRPC/AMQP/WebSockets | gRPC needs a proxy for browser access + no internal services to optimize (ADR-0001); AMQP already rejected (ADR-0010); WebSockets would undo statelessness (Q7). Also covers: synchronous request/response style (= ADR-0010's conclusion, restated), no API versioning needed (extends ADR-0009), API expand/contract discipline | [0022](adr/0022-communication-protocol.md) |
+| Retry/timeout/backoff: idempotency-aware client retries; transient-fault DB retry; no circuit breaker; ingress timeouts untouched | Respects ADR-0022 (idempotency) and ADR-0004/Q6 (409s aren't transient faults); no external deps to circuit-break | [0023](adr/0023-retry-timeout-backoff.md) |
 
 ## ATAM-lite: risks, sensitivity points, trade-offs
 | # | Type | Item | Detail | Disposition |
