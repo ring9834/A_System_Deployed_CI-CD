@@ -5,13 +5,16 @@ type TodoPageDto = paths["/todos"]["get"]["responses"][200]["content"]["applicat
 type CreateTodoRequest = paths["/todos"]["post"]["requestBody"]["content"]["application/json"];
 
 export async function fetchTodos(page = 1, pageSize = 20): Promise<TodoPageDto> {
-  const res = await fetch(`/api/todos?page=${page}&pageSize=${pageSize}`);
+  const res = await fetch(`/api/todos?page=${page}&pageSize=${pageSize}`, {
+    credentials: "same-origin",
+  });
   if (!res.ok) throw new Error(`Failed to load todos: ${res.status}`);
   return res.json();
 }
 
 export async function createTodo(request: CreateTodoRequest): Promise<TodoDto> {
   const res = await fetch("/api/todos", {
+    credentials: "same-origin",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -29,6 +32,7 @@ export async function transitionTodo(
   scheduledFor?: string
 ): Promise<TodoDto> {
   const res = await fetch(`/api/todos/${id}/transition`, {
+    credentials: "same-origin",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ targetState, scheduledFor }),
@@ -53,6 +57,7 @@ export async function updateTodo(
   eTag: string
 ): Promise<TodoDto> {
   const res = await fetch(`/api/todos/${id}`, {
+    credentials: "same-origin",
     method: "PUT",
     headers: { "Content-Type": "application/json", "If-Match": `"${eTag}"` },
     body: JSON.stringify({ title, location }),
@@ -66,10 +71,36 @@ export async function updateTodo(
 }
 
 export async function deleteTodo(id: string): Promise<void> {
-  const res = await fetch(`/api/todos/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/todos/${id}`, { method: "DELETE", credentials: "same-origin" });
   if (!res.ok && res.status !== 404) {
     throw new Error(`Failed to delete: ${res.status}`);
   }
 }
 
 export type { TodoDto, TodoPageDto, CreateTodoRequest };
+
+export async function register(username: string, password: string): Promise<void> {
+  const res = await fetch("/api/auth/register", {
+    credentials: "same-origin",
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const problem = await res.json().catch(() => null);
+    throw new Error(problem?.detail ?? `Registration failed: ${res.status}`);
+  }
+}
+
+export async function login(username: string, password: string): Promise<void> {
+  const res = await fetch("/api/auth/login", {
+    credentials: "same-origin",
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const problem = await res.json().catch(() => null);
+    throw new Error(problem?.detail ?? `Login failed: ${res.status}`);
+  }
+}

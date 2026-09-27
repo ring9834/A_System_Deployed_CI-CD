@@ -45,6 +45,15 @@ public class TodoService
         return new TodoPageDto(items.Select(ToDto).ToList(), page, pageSize, totalCount);
     }
 
+    public async Task<TodoDto> GetByIdAsync(Guid ownerId, Guid todoId, CancellationToken ct)
+    {
+        var todo = await _db.Todos.FirstOrDefaultAsync(t => t.Id == todoId && t.OwnerId == ownerId, ct);
+        if (todo is null)
+            throw new KeyNotFoundException(); // Q1: not found or not owned -> 404, never leak which
+
+        return ToDto(todo);
+    }
+
     public async Task<TodoDto> TransitionAsync(
         Guid ownerId, Guid todoId, TodoState target, DateTimeOffset? scheduledFor, CancellationToken ct)
     {

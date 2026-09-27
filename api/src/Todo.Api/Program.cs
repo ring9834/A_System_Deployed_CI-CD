@@ -1,43 +1,76 @@
+using System.Security.Claims;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Todo.Application.Auth;
 using Todo.Application.Todos;
 using Todo.Domain;
+using Todo.Domain.Entities;
 using Todo.Infrastructure;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Config (ADR-0024): non-secret values from appsettings/ConfigMap, secrets from env
-//     vars sourced by the K8s Secret (ADR-0005) — nothing hardcoded here either way.
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
 
-// --- DB (ADR-0004, ADR-0023): EnableRetryOnFailure for transient faults only — this
-//     must NEVER retry a 409 optimistic-concurrency conflict, which is an application
-//     decision surfaced to the client, not a transient fault. EF Core's retry strategy
-//     only engages on real transport/connection failures, so this boundary holds
-//     automatically — nothing extra needed to enforce it.
 builder.Services.AddDbContext<TodoDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql =>
     {
         npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorCodesToAdd: null);
-        npgsql.CommandTimeout(10); // short — every query here is fast CRUD (ADR-0022)
+        npgsql.CommandTimeout(10);
     }));
 
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<TodoService>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
-// --- Errors: built-in ASP.NET Core ProblemDetails (RFC 9457), not hand-rolled
-//     middleware — this is native since .NET 8, use the framework rather than
-//     reinventing it.
+// --- Auth (ADR-0007 mechanism, ADR-0002 transport): self-issued JWT, delivered via an
+// httpOnly cookie, not the Authorization header. The JWT bearer handler's default token
+// extraction only looks at the Authorization header, so OnMessageReceived is overridden to
+// read it from the cookie instead — this is the one non-default piece of this setup.
+const string CookieName = Program.AuthCookieName;
+var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
+    ?? throw new InvalidOperationException("Jwt:SigningKey is not configured — set it via a secret, never in appsettings.json.");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Without this, ASP.NET Core silently remaps short claim names like "sub" to old,
+        // verbose legacy URIs when READING an incoming token (issued as "sub", but seen by
+        // application code as "http://schemas.xmlsoap.org/.../nameidentifier") — a very
+        // well-known .NET gotcha. Confirmed here via every OwnerId-reading endpoint
+        // throwing InternalServerError once auth itself started working correctly.
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,   // self-issued, single-service — no external issuer to check
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.TryGetValue(CookieName, out var token))
+                    context.Token = token;
+                return Task.CompletedTask;
+            },
+        };
+    });
+builder.Services.AddAuthorization();
+
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<Todo.Api.Middleware.TodoExceptionHandler>();
 
-// --- Observability (ADR-0018): OpenTelemetry SDK now, console exporter for now —
-//     backend/dashboard choice is deferred, not the instrumentation itself.
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddService("todo-api"))
     .WithTracing(t => t
@@ -56,9 +89,6 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// Local dev convenience only — production migrations run via a Helm pre-upgrade hook Job
-// (ADR-0004), specifically to avoid multiple replicas racing to migrate concurrently. This
-// path only ever runs in Development (docker-compose), never in the deployed environment.
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
@@ -67,12 +97,22 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" })); // Step 4 skeleton; see
-                                                                  // ADR-0023 re: deepening
-                                                                  // this to check DB
-                                                                  // connectivity in Step 6
+
+// Authentication/authorization MUST be registered before any Map* calls in the minimal
+// hosting model — interleaving them with endpoint mapping is a well-documented source of
+// [Authorize] silently not being enforced. This ordering is unambiguous and always correct,
+// regardless of the exact implicit-routing-insertion mechanics for any specific case.
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
 
 app.Run();
 
-public partial class Program { } // exposed for Todo.IntegrationTests' WebApplicationFactory
+// Exposed so Api-layer code (AuthController) and tests can issue/name the auth cookie
+// consistently without a magic string duplicated in multiple places.
+public partial class Program
+{
+    public const string AuthCookieName = "todo_session";
+}

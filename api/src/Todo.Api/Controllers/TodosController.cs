@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Todo.Api.Extensions;
 using Todo.Application.Todos;
 using Todo.Application.Todos.Dtos;
 using Todo.Domain.Entities;
@@ -6,24 +8,24 @@ using Todo.Domain.Entities;
 namespace Todo.Api.Controllers;
 
 [ApiController]
+[Authorize] // Slice 4: every action below now genuinely requires a valid session
 [Route("todos")] // ingress strips /api before forwarding — see ADR-0002's rewrite note
 public class TodosController : ControllerBase
 {
     private readonly TodoService _todos;
 
-    // TODO(Slice 4): replace with the real authenticated user's OwnerId from the JWT
-    // cookie (ADR-0007). Hardcoded here deliberately — Slices 1-3 build against a single
-    // seeded user so their tests stay simple; Slice 4 retrofits real ownership on top of
-    // already-working, already-tested behaviour.
-    private static readonly Guid DevOwnerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-
     public TodosController(TodoService todos) => _todos = todos;
+
+    // Slice 1-3 built against a hardcoded OwnerId deliberately, so those tests stayed
+    // simple; this retrofits real ownership onto already-working, already-tested behaviour
+    // by reading it from the authenticated JWT (ADR-0007) instead.
+    private Guid OwnerId => User.GetOwnerId();
 
     [HttpPost]
     public async Task<ActionResult<TodoDto>> Create(
         [FromBody] CreateTodoRequest request, CancellationToken ct)
     {
-        var dto = await _todos.CreateAsync(DevOwnerId, request, ct);
+        var dto = await _todos.CreateAsync(OwnerId, request, ct);
         return CreatedAtAction(nameof(Create), new { id = dto.Id }, dto);
     }
 
@@ -37,8 +39,15 @@ public class TodosController : ControllerBase
         if (page < 1 || pageSize is < 1 or > 100)
             return ValidationProblem("page must be >=1 and pageSize must be 1-100.");
 
-        var result = await _todos.ListAsync(DevOwnerId, state, page, pageSize, ct);
+        var result = await _todos.ListAsync(OwnerId, state, page, pageSize, ct);
         return Ok(result);
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<TodoDto>> GetById(Guid id, CancellationToken ct)
+    {
+        var dto = await _todos.GetByIdAsync(OwnerId, id, ct);
+        return Ok(dto);
     }
 
     [HttpPost("{id:guid}/transition")]
@@ -48,7 +57,7 @@ public class TodosController : ControllerBase
         if (!Enum.TryParse<TodoState>(request.TargetState, ignoreCase: true, out var target))
             return ValidationProblem($"Unknown target state '{request.TargetState}'.");
 
-        var dto = await _todos.TransitionAsync(DevOwnerId, id, target, request.ScheduledFor, ct);
+        var dto = await _todos.TransitionAsync(OwnerId, id, target, request.ScheduledFor, ct);
         return Ok(dto);
     }
 
@@ -60,14 +69,14 @@ public class TodosController : ControllerBase
         if (string.IsNullOrWhiteSpace(ifMatch))
             return ValidationProblem("If-Match header is required.");
 
-        var dto = await _todos.UpdateAsync(DevOwnerId, id, request, ifMatch, ct);
+        var dto = await _todos.UpdateAsync(OwnerId, id, request, ifMatch, ct);
         return Ok(dto);
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        await _todos.DeleteAsync(DevOwnerId, id, ct);
+        await _todos.DeleteAsync(OwnerId, id, ct);
         return NoContent();
     }
 }

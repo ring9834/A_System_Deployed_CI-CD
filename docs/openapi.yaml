@@ -15,6 +15,24 @@ security:
   - cookieAuth: []
 
 paths:
+  /auth/register:
+    post:
+      summary: Self-issue a new account (ADR-0007 — minimal, not a real IdP)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, minLength: 3 }
+                password: { type: string, format: password, minLength: 8 }
+      responses:
+        '201': { description: Account created; Set-Cookie header carries the JWT }
+        '409': { description: Username already taken }
+
   /auth/login:
     post:
       summary: Authenticate and receive a JWT session cookie (self-issued, per ADR-0007/A6)
