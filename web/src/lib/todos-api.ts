@@ -1,0 +1,26 @@
+import type { paths } from "./api-types";
+
+type TodoDto = paths["/todos"]["get"]["responses"][200]["content"]["application/json"]["items"][number];
+type TodoPageDto = paths["/todos"]["get"]["responses"][200]["content"]["application/json"];
+type CreateTodoRequest = paths["/todos"]["post"]["requestBody"]["content"]["application/json"];
+
+export async function fetchTodos(page = 1, pageSize = 20): Promise<TodoPageDto> {
+  const res = await fetch(`/api/todos?page=${page}&pageSize=${pageSize}`);
+  if (!res.ok) throw new Error(`Failed to load todos: ${res.status}`);
+  return res.json();
+}
+
+export async function createTodo(request: CreateTodoRequest): Promise<TodoDto> {
+  const res = await fetch("/api/todos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    const problem = await res.json().catch(() => null);
+    throw new Error(problem?.detail ?? `Failed to create todo: ${res.status}`);
+  }
+  return res.json();
+}
+
+export type { TodoDto, TodoPageDto, CreateTodoRequest };

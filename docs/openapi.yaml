@@ -194,7 +194,7 @@ components:
     Location:
       type: object
       description: Free-text address, optional coordinates; geocoding deferred (A1)
-      required: [address]
+      required: [address, latitude, longitude]
       properties:
         address: { type: string, maxLength: 500 }
         latitude: { type: number, format: double, nullable: true }
@@ -216,17 +216,19 @@ components:
 
     Todo:
       type: object
+      required: [id, title, state, location, scheduledFor, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
         state: { $ref: '#/components/schemas/TodoState' }
         location: { $ref: '#/components/schemas/Location' }
-        scheduledFor: { type: string, format: date-time, nullable: true }   # A2
+        scheduledFor: { type: string, format: date-time, nullable: true }   # A2 — always present in the payload; null when unscheduled
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
     TodoPage:
       type: object
+      required: [items, page, pageSize, totalCount]
       properties:
         items:
           type: array
