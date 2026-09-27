@@ -45,16 +45,33 @@ public class TodoItem
         };
     }
 
-    // --- Slice 2 (TDD): implement against TodoStateMachineTests, not the other way around ---
-    //
-    // public void TransitionTo(TodoState target, DateTimeOffset? scheduledFor, IClock clock)
-    // {
-    //     // A3 legal transitions: Todo<->Scheduled, Todo->Done, Scheduled->Done.
-    //     // Done is terminal — no transition leaves it.
-    //     // Scheduled requires scheduledFor; unscheduling (Scheduled->Todo) clears it.
-    //     // On any illegal transition: throw new InvalidTodoTransitionException(State, target);
-    //     throw new NotImplementedException("Implement via TDD in Slice 2 — see design.md's state diagram.");
-    // }
+    // A3's legal transitions, as an explicit edge set — anything not listed here (including
+    // a same-state "transition", and anything leaving Done) is rejected. Checked BEFORE the
+    // scheduledFor requirement below, so an illegal transition always reports as illegal,
+    // even if scheduledFor is also missing.
+    private static readonly HashSet<(TodoState From, TodoState To)> LegalTransitions = new()
+    {
+        (TodoState.Todo, TodoState.Scheduled),
+        (TodoState.Scheduled, TodoState.Todo),
+        (TodoState.Todo, TodoState.Done),
+        (TodoState.Scheduled, TodoState.Done),
+    };
+
+    public void TransitionTo(TodoState target, DateTimeOffset? scheduledFor, IClock clock)
+    {
+        if (!LegalTransitions.Contains((State, target)))
+            throw new InvalidTodoTransitionException(State, target);
+
+        if (target == TodoState.Scheduled && scheduledFor is null)
+            throw new ArgumentException("scheduledFor is required when scheduling a todo.", nameof(scheduledFor));
+
+        // Unscheduling (Scheduled -> Todo) clears scheduledFor (design.md's invariant).
+        // Moving to Done deliberately leaves scheduledFor untouched — it's kept as a record
+        // of when the job was originally scheduled for, not cleared.
+        ScheduledFor = target == TodoState.Todo ? null : (target == TodoState.Scheduled ? scheduledFor : ScheduledFor);
+        State = target;
+        UpdatedAt = clock.UtcNow;
+    }
 
     public void UpdateDetails(string title, string locationAddress, double? lat, double? lng, IClock clock)
     {

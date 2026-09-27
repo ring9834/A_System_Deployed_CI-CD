@@ -325,6 +325,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description Concurrency token (from PostgreSQL's xmin, ADR-0004). Exposed in the body, not only as the ETag response header, because the list endpoint returns many items in one response and a single HTTP header can't carry a per-item value. Send back unchanged via If-Match on PUT. */
+            eTag: string;
         };
         TodoPage: {
             items: components["schemas"]["Todo"][];

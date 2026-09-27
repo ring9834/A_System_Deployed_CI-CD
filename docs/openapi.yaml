@@ -216,7 +216,7 @@ components:
 
     Todo:
       type: object
-      required: [id, title, state, location, scheduledFor, createdAt, updatedAt]
+      required: [id, title, state, location, scheduledFor, createdAt, updatedAt, eTag]
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
@@ -225,6 +225,13 @@ components:
         scheduledFor: { type: string, format: date-time, nullable: true }   # A2 — always present in the payload; null when unscheduled
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        eTag:
+          type: string
+          description: >
+            Concurrency token (from PostgreSQL's xmin, ADR-0004). Exposed in the body,
+            not only as the ETag response header, because the list endpoint returns many
+            items in one response and a single HTTP header can't carry a per-item value.
+            Send back unchanged via If-Match on PUT.
 
     TodoPage:
       type: object
