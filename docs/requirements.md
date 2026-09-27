@@ -13,6 +13,7 @@ is written down before implementation, not invented afterwards.
 | A5 | Mobile or web UI? | Web (Next.js) | Matches chosen stack; brief allows either |
 | A6 | Is a full identity provider in scope? | No — full OIDC/IdP integration is out of scope for the assessment; some lighter form of authentication is required (per A4, multi-user) and the mechanism is decided in [ADR-0007](adr/0007-authentication-mechanism.md), not assumed here | Standing up or integrating a real IdP is disproportionate setup cost for this time box; which mechanism to use instead is an architecture decision, not a requirements assumption |
 | A7 | Offline support? | Out of scope | Not implied by the brief; adds complexity with no stated benefit |
+| A8 | Target browser support? | Modern evergreen browsers only (current Chrome/Safari/Firefox/Edge, desktop and mobile), no legacy/IE11 support | Not specified by the brief; avoids silent scope creep into cross-browser polyfill work |
 
 ## 2. Backlog with a cut line
 Reasoned prioritisation of an intentionally oversized brief.
@@ -31,6 +32,7 @@ Reasoned prioritisation of an intentionally oversized brief.
 - Observability beyond basic health/logs (metrics, tracing) — valuable, low interview signal
 - HPA / autoscaling — real concern, low signal at todo-app scale
 - Distributed caching (e.g. Redis) for frequently-requested, relatively stable data — valuable once traffic/instances grow; only pays off once the API is already stateless and running across multiple instances, so it's a pure addition later rather than a prerequisite now
+- Idempotency key on `POST /todos` — a network retry could currently create a duplicate todo; low severity for a personal todo list, deferred until it's a demonstrated real annoyance (see ADR-0022)
 
 ### Out of scope
 - Offline support (A7)
@@ -50,6 +52,12 @@ High/High rows drive the Step 2 architecture decisions (ADD-lite).
 | Q5 | Modifiability | Add a new field end to end (migration -> DTO -> UI) | M/L | Timed manual drill (Step 7), target < 30 min, no AI |
 | Q6 | Data integrity | Two clients update the same todo concurrently | M/M | Integration test: second write gets 409 via concurrency token (xmin) |
 | Q7 | Scalability | API runs as N replicas behind a load balancer; any instance can serve any request | H/L | ADR: stateless API, no in-process session/cache; integration test hits the same endpoint via two instances (or a mid-test restart) and gets an identical result. Priority is H (cheap now, costly to retrofit) even though risk of getting it wrong is L (near-default for ASP.NET Core). Caching implementation itself (Redis) is deferred — see backlog. |
+| Q8 | Testability | Domain state machine (Q2) is unit-testable in isolation — no HTTP host, no database | H/L | Already satisfied by ADR-0003's layering; `TodoStateMachineTests` runs in milliseconds |
+| Q9 | Testability | API integration tests run against the real database engine, not a stand-in, catching genuine query/schema issues (Q1, Q6) | H/M | ADR-0016: Testcontainers PostgreSQL, run in CI (Docker available natively on `ubuntu-latest`) |
+| Q10 | Testability | Frontend components are testable in isolation without a real backend running | M/L | ADR-0016: mock `fetch` directly per test; MSW deferred until a real trigger is hit |
+| Q11 | Testability | Time-dependent logic (`ScheduledFor`, A2) is testable without waiting on or awkwardly mocking the wall clock | M/L | ADR-0016: narrow `IClock` port, the one deliberate exception to "no repository/port layer" |
+| Q12 | Portability | A gardener accesses and updates their todos from a phone browser while on-site with a customer | H/M | ADR-0017: responsive, mobile-first web UI; manual verification at common breakpoints; no native app built |
+| Q13 | Observability | Given only logs/metrics/traces (no debugger attached), determine whether a specific request succeeded, how long it took, and which user made it | H/L | ADR-0018: structured logs + correlation ID (free via ASP.NET Core `Activity`/`TraceIdentifier`) + OpenTelemetry-based metrics/traces, vendor-neutral; backend/exporter choice deferred |
 
 ## Traceability (sample rows)
 | Requirement | Quality scenario | ADR (Step 2) | Test | Pipeline gate |

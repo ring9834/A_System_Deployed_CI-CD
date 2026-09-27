@@ -40,6 +40,8 @@ and every `partial` or `deferred` row needs a one-line reason. Update this file 
 | Operability | README quickstart; cold start productive in < 5 min | todo | | |
 | Operability | One-command local stack | todo | | |
 | Operability | Runbook (crash loop, DB unreachable, bad deploy) | todo | | |
+| Observability | Structured logs with correlation ID | done | | free via Activity/TraceIdentifier, no custom work |
+| Observability | Metrics / traces (OpenTelemetry) | partial | instrumentation present once built, no backend/dashboard | backend choice deferred per ADR-0018, trigger: real dashboarding/alerting need |
 
 ## Definition of Done (per change)
 - [ ] Acceptance criteria met
