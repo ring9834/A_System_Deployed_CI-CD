@@ -144,6 +144,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read   # required for CodeQL to query workflow-run info — without this,
+                       # "Resource not accessible by integration" on the analyze step,
+                       # even though the scan itself completes successfully
     strategy:
       matrix: { language: ["csharp", "javascript-typescript"] }
     steps:
