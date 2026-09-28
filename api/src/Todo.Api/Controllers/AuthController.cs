@@ -50,6 +50,21 @@ public class AuthController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        // Delete relies on matching the exact same cookie options used to set it (path,
+        // in particular) — using CookieOptions consistently here avoids a mismatched
+        // Delete silently no-op'ing, a real and common gotcha with cookie clearing.
+        Response.Cookies.Delete(Program.AuthCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !_env.IsDevelopment(),
+            SameSite = SameSiteMode.Lax,
+        });
+        return NoContent();
+    }
+
     // ADR-0007: JWT carries the OwnerId as its "sub" claim — every /todos query filters by
     // this, read from the validated token, never from anything the client sends in a body.
     // ADR-0002: delivered via an httpOnly, Secure, SameSite=Lax cookie, not returned in the

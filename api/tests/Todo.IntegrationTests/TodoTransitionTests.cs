@@ -27,17 +27,12 @@ public class TodoTransitionTests : IClassFixture<WebApplicationFactory<Program>>
         });
     }
 
-    private async Task<HttpClient> NewMigratedClientAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<TodoDbContext>().Database.MigrateAsync();
-        return _factory.CreateClient();
-    }
+    
 
     [Fact]
     public async Task Transition_todo_to_scheduled_succeeds_and_stores_scheduledFor()
     {
-        var client = await NewMigratedClientAsync();
+        var client = await _factory.NewRegisteredClientAsync();
         var created = await (await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "Mow the lawn", new LocationDto("1 Example Rd", null, null)))).Content.ReadFromJsonAsync<TodoDto>();
 
@@ -53,7 +48,7 @@ public class TodoTransitionTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Transition_from_done_returns_409()
     {
-        var client = await NewMigratedClientAsync();
+        var client = await _factory.NewRegisteredClientAsync();
         var created = await (await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "One-off job", new LocationDto("2 Example Rd", null, null)))).Content.ReadFromJsonAsync<TodoDto>();
 

@@ -27,17 +27,12 @@ public class TodoUpdateDeleteTests : IClassFixture<WebApplicationFactory<Program
         });
     }
 
-    private async Task<HttpClient> NewMigratedClientAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<TodoDbContext>().Database.MigrateAsync();
-        return _factory.CreateClient();
-    }
+    
 
     [Fact]
     public async Task Update_with_correct_ETag_succeeds()
     {
-        var client = await NewMigratedClientAsync();
+        var client = await _factory.NewRegisteredClientAsync();
         var created = await (await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "Weed the beds", new LocationDto("1 Example Rd", null, null)))).Content.ReadFromJsonAsync<TodoDto>();
 
@@ -58,7 +53,7 @@ public class TodoUpdateDeleteTests : IClassFixture<WebApplicationFactory<Program
         // The core Q6 test: two clients read the same todo, one updates first, the second's
         // update (using the now-stale ETag it originally read) must be rejected — this is
         // what actually proves the xmin-based optimistic concurrency check works end to end.
-        var client = await NewMigratedClientAsync();
+        var client = await _factory.NewRegisteredClientAsync();
         var created = await (await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "Rake leaves", new LocationDto("2 Example Rd", null, null)))).Content.ReadFromJsonAsync<TodoDto>();
 
@@ -85,7 +80,7 @@ public class TodoUpdateDeleteTests : IClassFixture<WebApplicationFactory<Program
     [Fact]
     public async Task Update_without_If_Match_header_returns_400()
     {
-        var client = await NewMigratedClientAsync();
+        var client = await _factory.NewRegisteredClientAsync();
         var created = await (await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "Prune roses", new LocationDto("3 Example Rd", null, null)))).Content.ReadFromJsonAsync<TodoDto>();
 
@@ -98,7 +93,7 @@ public class TodoUpdateDeleteTests : IClassFixture<WebApplicationFactory<Program
     [Fact]
     public async Task Delete_then_delete_again_is_idempotent_second_call_returns_404()
     {
-        var client = await NewMigratedClientAsync();
+        var client = await _factory.NewRegisteredClientAsync();
         var created = await (await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "One-off job", new LocationDto("4 Example Rd", null, null)))).Content.ReadFromJsonAsync<TodoDto>();
 
