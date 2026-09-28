@@ -18,3 +18,11 @@ web:
 
 ingress:
   host: 4.147.5.137.nip.io  # e.g. todo.<your-dev-ip>.nip.io for a free dev hostname
+
+# Must match the name Terraform's kubernetes_secret.todo_secrets resource creates
+# (infra/terraform/main.tf) exactly — Helm only references this Secret by name, it never
+# creates or manages it (ADR-0005; see the "why not secret.yaml" discussion). If you ever
+# rename one side without the other, the pod fails to start with a clear "secret not found"
+# error, not a silent failure — but it IS two independently-edited strings, not something
+# Terraform and Helm coordinate automatically.
+secretsName: todo-secrets

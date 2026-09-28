@@ -11,7 +11,12 @@ resource "azurerm_container_registry" "this" {
   admin_enabled       = false # pull via AKS managed identity, not admin creds
 }
 
-# smallest viable node pool for a trial subscription — check quota in your region first (ADR-0014)
+# AKS-supported, subscription-allowed system-pool SKU. Must satisfy two separate gates:
+# (1) AKS's own rule: >=4 vCPU, no B-series/Av1 for system pools.
+# (2) This subscription's allowed-VM-size list for australiaeast (trial/restricted
+#     subscriptions often exclude whole families — e.g. F-series wasn't available here;
+#     Azure returns the full allowed list in the error if you hit this again).
+# D4s_v5: standard general-purpose 4 vCPU/16GB, confirmed present in the allowed list.
 resource "azurerm_kubernetes_cluster" "this" {
   name                = "${var.project}-${var.environment}-aks"
   resource_group_name = azurerm_resource_group.this.name
@@ -21,8 +26,10 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   default_node_pool {
     name       = "system"
-    node_count = 1
-    vm_size    = "Standard_D4s_v5" # 4 vCPU, 16GB RAM — check current pricing/quota
+    node_count = 1 # docs recommend >=2 for system pools; kept at 1 here deliberately for
+    # cost, on a personal assessment cluster with no production reliability
+    # requirement — verify this is actually accepted at apply time, not assumed
+    vm_size = "Standard_D4s_v5"
   }
 
   identity { type = "SystemAssigned" }
@@ -40,7 +47,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   location               = azurerm_resource_group.this.location
   version                = "16"
   sku_name               = "B_Standard_B1ms" # smallest burstable tier — check current pricing/quota
-  storage_mb              = 32768
+  storage_mb             = 32768
   administrator_login    = "todoadmin"
   administrator_password = var.db_admin_password
   zone                   = "1"
@@ -57,6 +64,48 @@ resource "azurerm_key_vault" "this" {
   location            = azurerm_resource_group.this.location
   sku_name            = "standard"
   tenant_id           = data.azurerm_client_config.current.tenant_id
+  # Missing originally — defaults to the legacy Access Policy model, which is why the
+  # "Key Vault Secrets User" role assignment below had no actual effect until this was set:
+  # the vault wasn't checking RBAC roles at all. Confirmed via a real 403 error, not assumed.
+  enable_rbac_authorization = true
 }
 
 data "azurerm_client_config" "current" {}
+
+# ADR-0005: this Secret is the sole source Helm's api-deployment.yaml references (envFrom) —
+# Helm never creates or edits it, avoiding dual ownership of the same K8s object. Values are
+# read from Key Vault, never hardcoded here or in any file committed to git. Populate the
+# two Key Vault secrets manually (az keyvault secret set) before the first apply of this block.
+data "azurerm_key_vault_secret" "db_connection_string" {
+  name         = "db-connection-string"
+  key_vault_id = azurerm_key_vault.this.id
+}
+
+data "azurerm_key_vault_secret" "jwt_signing_key" {
+  name         = "jwt-signing-key"
+  key_vault_id = azurerm_key_vault.this.id
+}
+
+resource "kubernetes_secret" "todo_secrets" {
+  metadata {
+    name = "todo-secrets" # must match values.yaml's secretsName default in the Helm chart
+  }
+  data = {
+    ConnectionStrings__Default = data.azurerm_key_vault_secret.db_connection_string.value
+    Jwt__SigningKey            = data.azurerm_key_vault_secret.jwt_signing_key.value
+  }
+  type = "Opaque"
+}
+
+# Grants whichever identity is actually running `terraform apply` (your local `az login`
+# session, or the CI service principal) permission to both read AND write secrets — "Key
+# Vault Secrets Officer" rather than the read-only "Key Vault Secrets User", since this same
+# identity is also the one running `az keyvault secret set` manually to seed values. Known
+# limitation: this only covers whichever identity applies most recently; if BOTH your local
+# user and CI need independent, persistent access, add a second explicit role assignment
+# naming the other identity's object ID rather than relying on this dynamic one to cover both.
+resource "azurerm_role_assignment" "terraform_keyvault_reader" {
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
