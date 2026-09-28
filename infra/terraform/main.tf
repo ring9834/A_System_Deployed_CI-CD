@@ -26,10 +26,10 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   default_node_pool {
     name       = "system"
-    node_count = 1   # docs recommend >=2 for system pools; kept at 1 here deliberately for
-                      # cost, on a personal assessment cluster with no production reliability
-                      # requirement — verify this is actually accepted at apply time, not assumed
-    vm_size    = "Standard_D4s_v5"
+    node_count = 1 # docs recommend >=2 for system pools; kept at 1 here deliberately for
+    # cost, on a personal assessment cluster with no production reliability
+    # requirement — verify this is actually accepted at apply time, not assumed
+    vm_size = "Standard_D4s_v5"
   }
 
   identity { type = "SystemAssigned" }
@@ -57,7 +57,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   location               = azurerm_resource_group.this.location
   version                = "16"
   sku_name               = "B_Standard_B1ms" # smallest burstable tier — check current pricing/quota
-  storage_mb              = 32768
+  storage_mb             = 32768
   administrator_login    = "todoadmin"
   administrator_password = var.db_admin_password
   zone                   = "1"
@@ -69,11 +69,11 @@ resource "azurerm_postgresql_flexible_server_database" "this" {
 }
 
 resource "azurerm_key_vault" "this" {
-  name                       = "${var.project}-${var.environment}-kv"
-  resource_group_name       = azurerm_resource_group.this.name
-  location                   = azurerm_resource_group.this.location
-  sku_name                   = "standard"
-  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  name                = "${var.project}-${var.environment}-kv"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  sku_name            = "standard"
+  tenant_id           = data.azurerm_client_config.current.tenant_id
   # Missing originally — defaults to the legacy Access Policy model, which is why the
   # "Key Vault Secrets User" role assignment below had no actual effect until this was set:
   # the vault wasn't checking RBAC roles at all. Confirmed via a real 403 error, not assumed.
@@ -102,7 +102,7 @@ resource "kubernetes_secret" "todo_secrets" {
   }
   data = {
     ConnectionStrings__Default = data.azurerm_key_vault_secret.db_connection_string.value
-    Jwt__SigningKey             = data.azurerm_key_vault_secret.jwt_signing_key.value
+    Jwt__SigningKey            = data.azurerm_key_vault_secret.jwt_signing_key.value
   }
   type = "Opaque"
 }
@@ -125,7 +125,7 @@ resource "azurerm_role_assignment" "local_user_keyvault_officer" {
 
 resource "azurerm_role_assignment" "ci_keyvault_reader" {
   scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Secrets User" # read-only — CI only ever reads secrets, never sets them
+  role_definition_name = "Key Vault Secrets User"               # read-only — CI only ever reads secrets, never sets them
   principal_id         = "2490b713-81fd-4fa8-97c7-d2b16d7ee5e7" # CI service principal
 }
 
