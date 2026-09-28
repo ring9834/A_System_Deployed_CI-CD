@@ -169,4 +169,4 @@ jobs:
             --set web.image.tag=${{ github.sha }} \
             --atomic --timeout 5m
       - name: Smoke test
-        run: curl -sf http://4.147.5.137.nip.io/api/health
+        run: curl -sf http://4.147.5.137.nip.io/api/health/ready
