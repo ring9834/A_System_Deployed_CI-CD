@@ -5,12 +5,12 @@ import "./globals.css";
 
 // Vendored locally (public/fonts) — no network access needed at build time, unlike
 // next/font/google, which hit a real, currently-unresolved Turbopack bug fetching from
-// Google's CDN during the Docker build. Paths are relative to THIS file (app/layout.tsx),
+// Googles CDN during the Docker build. Paths are relative to THIS file (app/layout.tsx),
 // so reaching public/ (a sibling of app/) needs "../public/...".
 //
-// Filenames below assume Google Fonts' standard static-export naming — confirm against
-// `dir web\public\fonts` and adjust any that don't match exactly; a wrong filename here
-// fails the build immediately and obviously, so it's cheap to fix once spotted.
+// Filenames below assume Google Fonts&apos; standard static-export naming — confirm against
+// `dir web\public\fonts` and adjust any that dont match exactly; a wrong filename here
+// fails the build immediately and obviously, so its cheap to fix once spotted.
 const spaceGrotesk = localFont({
   src: [
     { path: "../../public/fonts/SpaceGrotesk-Medium.ttf", weight: "500", style: "normal" },
@@ -33,7 +33,7 @@ const ibmPlexSans = localFont({
 
 export const metadata: Metadata = {
   title: "Todo Planner",
-  description: "Plan today's jobs — for gardeners working across multiple properties",
+  description: "Plan today&apos;s jobs — for gardeners working across multiple properties",
 };
 
 export default function RootLayout({
