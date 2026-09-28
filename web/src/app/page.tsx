@@ -8,7 +8,7 @@ export default function Home() {
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-ink sm:text-4xl">
-            {"Today's jobs"}
+            Today&apos;s jobs
           </h1>
           <p className="mt-1 text-ink/60">
             Add a job below and check it off as you go.
