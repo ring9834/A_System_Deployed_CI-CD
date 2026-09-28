@@ -18,6 +18,7 @@ and every `partial` or `deferred` row needs a one-line reason. Update this file 
 | Security | Containers non-root, read-only root filesystem | todo | | |
 | Security | Dependency + image vulnerability scanning in CI | todo | | |
 | Security | TLS at ingress | todo | | |
+| Security | Session cookie requires real ingress TLS in any non-Development environment (Secure flag) | todo | verified this dependency is real via a test failure, not just theoretical. |
 | Reliability | Liveness / readiness / startup probes | todo | | |
 | Reliability | >=2 replicas + PodDisruptionBudget | todo | | |
 | Reliability | Resource requests and limits | todo | | |

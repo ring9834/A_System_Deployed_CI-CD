@@ -4,6 +4,55 @@
  */
 
 export interface paths {
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Self-issue a new account (ADR-0007 — minimal, not a real IdP) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        username: string;
+                        /** Format: password */
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Account created; Set-Cookie header carries the JWT */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Username already taken */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -325,6 +374,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description Concurrency token (from PostgreSQL's xmin, ADR-0004). Exposed in the body, not only as the ETag response header, because the list endpoint returns many items in one response and a single HTTP header can't carry a per-item value. Send back unchanged via If-Match on PUT. */
+            eTag: string;
         };
         TodoPage: {
             items: components["schemas"]["Todo"][];

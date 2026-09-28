@@ -6,9 +6,6 @@ using Todo.Infrastructure;
 
 namespace Todo.Application.Todos;
 
-// Concrete class, injected directly — no ITodoService interface with a single
-// implementation (that would be indirection with no consumer that needs it, same
-// principle as ADR-0016's "no repository layer").
 public class TodoService
 {
     private readonly TodoDbContext _db;
@@ -34,8 +31,6 @@ public class TodoService
     public async Task<TodoPageDto> ListAsync(
         Guid ownerId, TodoState? state, int page, int pageSize, CancellationToken ct)
     {
-        // Q1: every query filtered by the authenticated caller's OwnerId — never from
-        // the request body. Q3: filtered by state, paginated.
         var query = _db.Todos.Where(t => t.OwnerId == ownerId);
         if (state is not null)
             query = query.Where(t => t.State == state);
@@ -50,9 +45,71 @@ public class TodoService
         return new TodoPageDto(items.Select(ToDto).ToList(), page, pageSize, totalCount);
     }
 
-    private static TodoDto ToDto(TodoItem t) => new(
-        t.Id, t.Title, t.State.ToString(),
-        new LocationDto(t.LocationAddress, t.LocationLatitude, t.LocationLongitude),
-        t.ScheduledFor, t.CreatedAt, t.UpdatedAt,
-        ETag: "" /* filled by the controller from the xmin shadow property — Slice 3 */);
+    public async Task<TodoDto> GetByIdAsync(Guid ownerId, Guid todoId, CancellationToken ct)
+    {
+        var todo = await _db.Todos.FirstOrDefaultAsync(t => t.Id == todoId && t.OwnerId == ownerId, ct);
+        if (todo is null)
+            throw new KeyNotFoundException(); // Q1: not found or not owned -> 404, never leak which
+
+        return ToDto(todo);
+    }
+
+    public async Task<TodoDto> TransitionAsync(
+        Guid ownerId, Guid todoId, TodoState target, DateTimeOffset? scheduledFor, CancellationToken ct)
+    {
+        var todo = await _db.Todos.FirstOrDefaultAsync(t => t.Id == todoId && t.OwnerId == ownerId, ct);
+        if (todo is null)
+            throw new KeyNotFoundException();
+
+        todo.TransitionTo(target, scheduledFor, _clock);
+        await _db.SaveChangesAsync(ct);
+        return ToDto(todo);
+    }
+
+    // Q6/ADR-0004: If-Match's value is the eTag the client last saw, sourced from the list
+    // body (not a header, per the openapi.yaml gap this slice fixed). We set it as the
+    // shadow xmin property's ORIGINAL value, so EF Core's own optimistic-concurrency check
+    // (comparing that original against the row's *actual* current xmin at UPDATE time)
+    // throws DbUpdateConcurrencyException — already mapped to 409 (TodoExceptionHandler) —
+    // if someone else changed the row in between. NOT VERIFIED — no NuGet access to compile
+    // or run this; this is the most advanced EF Core pattern in the project so far.
+    public async Task<TodoDto> UpdateAsync(
+        Guid ownerId, Guid todoId, UpdateTodoRequest request, string ifMatch, CancellationToken ct)
+    {
+        var todo = await _db.Todos.FirstOrDefaultAsync(t => t.Id == todoId && t.OwnerId == ownerId, ct);
+        if (todo is null)
+            throw new KeyNotFoundException();
+
+        if (!uint.TryParse(ifMatch.Trim('"'), out var expectedXmin))
+            throw new ArgumentException("If-Match is not a valid concurrency token.", nameof(ifMatch));
+
+        _db.Entry(todo).Property<uint>("xmin").OriginalValue = expectedXmin;
+
+        todo.UpdateDetails(request.Title, request.Location.Address,
+            request.Location.Latitude, request.Location.Longitude, _clock);
+
+        await _db.SaveChangesAsync(ct); // throws DbUpdateConcurrencyException on a stale If-Match
+        return ToDto(todo);
+    }
+
+    public async Task DeleteAsync(Guid ownerId, Guid todoId, CancellationToken ct)
+    {
+        var todo = await _db.Todos.FirstOrDefaultAsync(t => t.Id == todoId && t.OwnerId == ownerId, ct);
+        if (todo is null)
+            throw new KeyNotFoundException(); // DELETE is idempotent (ADR-0023) — this 404
+                                                // is the harmless "already gone" case too
+
+        _db.Todos.Remove(todo);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private TodoDto ToDto(TodoItem t)
+    {
+        var xmin = _db.Entry(t).Property<uint>("xmin").CurrentValue;
+        return new TodoDto(
+            t.Id, t.Title, t.State.ToString().ToLowerInvariant(),
+            new LocationDto(t.LocationAddress, t.LocationLatitude, t.LocationLongitude),
+            t.ScheduledFor, t.CreatedAt, t.UpdatedAt,
+            ETag: xmin.ToString());
+    }
 }

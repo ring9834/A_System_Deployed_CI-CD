@@ -14,6 +14,10 @@ public class TodoExceptionHandler : IExceptionHandler
     {
         var (status, title) = exception switch
         {
+            // Q1: not found, or found but not owned by the caller — 404 either way, never
+            // leak which case it was.
+            KeyNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
+
             // Q2: illegal state transition -> 409, not 400 — the request was
             // well-formed, it just conflicts with the resource's current state.
             InvalidTodoTransitionException => (StatusCodes.Status409Conflict, "Invalid state transition"),

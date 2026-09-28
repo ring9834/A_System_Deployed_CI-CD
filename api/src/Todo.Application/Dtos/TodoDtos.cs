@@ -8,6 +8,10 @@ public record TodoDto(
     Guid Id, string Title, string State, LocationDto Location,
     DateTimeOffset? ScheduledFor, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string ETag);
 
+public record UpdateTodoRequest(string Title, LocationDto Location);
+
 public record TodoPageDto(IReadOnlyList<TodoDto> Items, int Page, int PageSize, int TotalCount);
 
 public record CreateTodoRequest(string Title, LocationDto Location);
+
+public record TransitionTodoRequest(string TargetState, DateTimeOffset? ScheduledFor);

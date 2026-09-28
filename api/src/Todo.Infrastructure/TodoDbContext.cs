@@ -12,6 +12,7 @@ public class TodoDbContext : DbContext
     public TodoDbContext(DbContextOptions<TodoDbContext> options) : base(options) { }
 
     public DbSet<TodoItem> Todos => Set<TodoItem>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +30,14 @@ public class TodoDbContext : DbContext
             // design.md: the one index this app actually needs — every list query
             // filters by owner and (optionally) state together (Q1 + Q3).
             entity.HasIndex(t => new { t.OwnerId, t.State });
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(u => u.Id);
+            entity.Property(u => u.Username).HasMaxLength(100).IsRequired();
+            entity.HasIndex(u => u.Username).IsUnique();
+            entity.Property(u => u.PasswordHash).IsRequired();
         });
     }
 }
