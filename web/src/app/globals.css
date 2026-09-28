@@ -16,8 +16,8 @@
   --color-sage-600: #6e7b63;
   --color-danger: #a8382c;
 
-  --font-heading: "Space Grotesk", sans-serif;
-  --font-sans: "IBM Plex Sans", sans-serif;
+  --font-heading: var(--font-space-grotesk), sans-serif;
+  --font-sans: var(--font-ibm-plex-sans), sans-serif;
 }
 
 body {

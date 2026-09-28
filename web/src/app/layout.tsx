@@ -1,6 +1,35 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import { Providers } from "./providers";
 import "./globals.css";
+
+// Vendored locally (public/fonts) — no network access needed at build time, unlike
+// next/font/google, which hit a real, currently-unresolved Turbopack bug fetching from
+// Google's CDN during the Docker build. Paths are relative to THIS file (app/layout.tsx),
+// so reaching public/ (a sibling of app/) needs "../public/...".
+//
+// Filenames below assume Google Fonts' standard static-export naming — confirm against
+// `dir web\public\fonts` and adjust any that don't match exactly; a wrong filename here
+// fails the build immediately and obviously, so it's cheap to fix once spotted.
+const spaceGrotesk = localFont({
+  src: [
+    { path: "../../public/fonts/SpaceGrotesk-Medium.ttf", weight: "500", style: "normal" },
+    { path: "../../public/fonts/SpaceGrotesk-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "../../public/fonts/SpaceGrotesk-Bold.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
+
+const ibmPlexSans = localFont({
+  src: [
+    { path: "../../public/fonts/IBMPlexSans-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../../public/fonts/IBMPlexSans-Medium.ttf", weight: "500", style: "normal" },
+    { path: "../../public/fonts/IBMPlexSans-SemiBold.ttf", weight: "600", style: "normal" },
+  ],
+  variable: "--font-ibm-plex-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Todo Planner",
@@ -11,20 +40,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <head>
-        {/* next/font/google fetches font files at BUILD time, and Turbopack has a real,
-            currently-unresolved bug/fragility handling that fetch (see the exact error
-            "next/font/google queries have exactly one entry" — widely reported against
-            this Next.js version). Loading via <link> instead happens at runtime in the
-            browser, removing the build's dependency on reaching Google's servers at all. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
-        />
-      </head>
+    <html lang="en" className={`${spaceGrotesk.variable} ${ibmPlexSans.variable}`}>
       <body className="font-sans antialiased">
         <Providers>{children}</Providers>
       </body>
