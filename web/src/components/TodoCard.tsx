@@ -63,7 +63,7 @@ export function TodoCard({ todo }: { todo: TodoDto }) {
             <p role="alert" className="text-sm text-danger">
               {update.error instanceof ConcurrencyConflictError
                 ? update.error.message
-                : `Couldn't save: ${update.error.message}`}
+                : `Couldn&apos;t save: ${update.error.message}`}
             </p>
           )}
         </div>

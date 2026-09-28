@@ -48,7 +48,7 @@ describe("TodoCard", () => {
     expect(screen.queryByRole("button", { name: /mark done/i })).not.toBeInTheDocument();
   });
 
-  it("Edit -> Save sends PUT with If-Match set to the todo's current eTag", async () => {
+  it("Edit -> Save sends PUT with If-Match set to the todo&apos;s current eTag", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true, json: async () => ({ ...baseTodo, title: "Mow the back lawn" }),
     });
