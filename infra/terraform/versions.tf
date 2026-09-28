@@ -14,10 +14,18 @@ terraform {
   # only the Terraform state file, are shared across all environments, and must never be
   # touched by `terraform destroy` run against this config.
   backend "azurerm" {
-    resource_group_name  = "rush-todo-tfstate-rg"
+    resource_group_name  = "rush-todo-tfstate-shared-rg"
     storage_account_name = "rushtodotfstate8791"
-    container_name       = "tfstate"
-    key                  = "rush-todo.tfstate" # per-environment key if you add more later
+    container_name        = "tfstate"
+    key                    = "rush-todo-dev.tfstate"   # per-environment key if you add more later
+    # Without this, the backend authenticates to the state BLOB using the storage
+    # account's access key (fetched via listKeys — a separate control-plane permission
+    # requiring broad, unscoped account access), not the AAD/OIDC token already used for
+    # everything else in this project. Confirmed via a real 403 on listKeys/action.
+    # This makes the Storage Blob Data Contributor role already granted sufficient on its
+    # own — no listKeys permission needed at all, consistent with RBAC-only access
+    # everywhere else in this project (same principle as the Key Vault RBAC switch).
+    use_azuread_auth       = true
   }
 }
 

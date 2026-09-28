@@ -121,7 +121,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check
-      - run: terraform init
+      - run: terraform init -reconfigure
       - run: terraform validate
       - run: terraform plan
   helm-check:
