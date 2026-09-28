@@ -26,18 +26,20 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   default_node_pool {
     name       = "system"
-    node_count = 1 # docs recommend >=2 for system pools; kept at 1 here deliberately for
-    # cost, on a personal assessment cluster with no production reliability
-    # requirement — verify this is actually accepted at apply time, not assumed
-    vm_size = "Standard_D4s_v5"
+    node_count = 1   # docs recommend >=2 for system pools; kept at 1 here deliberately for
+                      # cost, on a personal assessment cluster with no production reliability
+                      # requirement — verify this is actually accepted at apply time, not assumed
+    vm_size    = "Standard_D4s_v5"
   }
 
   identity { type = "SystemAssigned" }
 
-  # Azure returns default upgrade_settings values that weren't explicitly set here, which
-  # every plan then tries to "correct" back to null — a real, recurring problem: it blocked
-  # a targeted apply on ANY other resource whenever the cluster was stopped. Ignored
-  # explicitly rather than fought repeatedly — Azure's defaults here are fine as-is.
+  # Azure returns default upgrade_settings values (drain_timeout_in_minutes, max_surge, etc.)
+  # that weren't explicitly set here, which every plan then tries to "correct" back to null —
+  # a real, recurring problem: it blocked a targeted apply on ANY other resource whenever the
+  # cluster was stopped, since -target pulls in the kubernetes provider's dependency
+  # (this cluster) and Terraform then tries to reconcile this drift too. Ignored explicitly
+  # rather than fought repeatedly — Azure's defaults here are fine as-is.
   lifecycle {
     ignore_changes = [default_node_pool[0].upgrade_settings]
   }
@@ -55,7 +57,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   location               = azurerm_resource_group.this.location
   version                = "16"
   sku_name               = "B_Standard_B1ms" # smallest burstable tier — check current pricing/quota
-  storage_mb             = 32768
+  storage_mb              = 32768
   administrator_login    = "todoadmin"
   administrator_password = var.db_admin_password
   zone                   = "1"
@@ -67,11 +69,11 @@ resource "azurerm_postgresql_flexible_server_database" "this" {
 }
 
 resource "azurerm_key_vault" "this" {
-  name                = "${var.project}-${var.environment}-kv"
-  resource_group_name = azurerm_resource_group.this.name
-  location            = azurerm_resource_group.this.location
-  sku_name            = "standard"
-  tenant_id           = data.azurerm_client_config.current.tenant_id
+  name                       = "${var.project}-${var.environment}-kv"
+  resource_group_name       = azurerm_resource_group.this.name
+  location                   = azurerm_resource_group.this.location
+  sku_name                   = "standard"
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
   # Missing originally — defaults to the legacy Access Policy model, which is why the
   # "Key Vault Secrets User" role assignment below had no actual effect until this was set:
   # the vault wasn't checking RBAC roles at all. Confirmed via a real 403 error, not assumed.
@@ -100,7 +102,7 @@ resource "kubernetes_secret" "todo_secrets" {
   }
   data = {
     ConnectionStrings__Default = data.azurerm_key_vault_secret.db_connection_string.value
-    Jwt__SigningKey            = data.azurerm_key_vault_secret.jwt_signing_key.value
+    Jwt__SigningKey             = data.azurerm_key_vault_secret.jwt_signing_key.value
   }
   type = "Opaque"
 }
@@ -110,12 +112,21 @@ resource "kubernetes_secret" "todo_secrets" {
 # Vault Secrets Officer" rather than the read-only "Key Vault Secrets User", since this same
 # identity is also the one running `az keyvault secret set` manually to seed values. Known
 # limitation: this only covers whichever identity applies most recently; if BOTH your local
-# user and CI need independent, persistent access, add a second explicit role assignment
-# naming the other identity's object ID rather than relying on this dynamic one to cover both.
-resource "azurerm_role_assignment" "terraform_keyvault_reader" {
+# Split into two static, permanent grants instead of one dynamic one — the dynamic
+# `data.azurerm_client_config.current.object_id` only ever matched whoever happened to run
+# `apply` most recently, causing a destroy-then-recreate every time a DIFFERENT identity ran
+# it next (confirmed via a real 403: CI's service principal genuinely never had Key Vault
+# access, since every prior grant/import today was done under the local user's own login).
+resource "azurerm_role_assignment" "local_user_keyvault_officer" {
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = "ead30023-201f-42a5-9e39-f9bc01d812fb" # local user — for manual az keyvault secret set
+}
+
+resource "azurerm_role_assignment" "ci_keyvault_reader" {
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets User" # read-only — CI only ever reads secrets, never sets them
+  principal_id         = "2490b713-81fd-4fa8-97c7-d2b16d7ee5e7" # CI service principal
 }
 
 # Fixes a real connectivity gap: the Postgres Flexible Server ships with zero firewall
