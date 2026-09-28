@@ -130,7 +130,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
       - run: helm lint deploy/helm/todo-planner
-      - run: helm template deploy/helm/todo-planner | kubectl apply --dry-run=client --validate=false -f -
+      - name: Render chart
+        run: helm template deploy/helm/todo-planner --values deploy/helm/todo-planner/values.yaml > rendered.yaml
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Validate manifests (fully offline — no cluster needed)
+        run: kubeconform -strict -summary rendered.yaml
 
   codeql:
     runs-on: ubuntu-latest
