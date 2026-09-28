@@ -33,6 +33,14 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
 
   identity { type = "SystemAssigned" }
+
+  # Azure returns default upgrade_settings values that weren't explicitly set here, which
+  # every plan then tries to "correct" back to null — a real, recurring problem: it blocked
+  # a targeted apply on ANY other resource whenever the cluster was stopped. Ignored
+  # explicitly rather than fought repeatedly — Azure's defaults here are fine as-is.
+  lifecycle {
+    ignore_changes = [default_node_pool[0].upgrade_settings]
+  }
 }
 
 resource "azurerm_role_assignment" "aks_pull" {
@@ -108,4 +116,18 @@ resource "azurerm_role_assignment" "terraform_keyvault_reader" {
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets Officer"
   principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# Fixes a real connectivity gap: the Postgres Flexible Server ships with zero firewall
+# rules by default, meaning NOTHING can reach it until explicitly allowed — confirmed via a
+# real Npgsql connection timeout from a running pod, not assumed. start=0.0.0.0/end=0.0.0.0
+# is Azure's documented special value meaning "allow any Azure-internal service", not a
+# literal open-to-the-internet rule. This is the pragmatic choice for AKS-without-VNet-
+# integration; a VNet-integrated setup (private access) would be the more secure alternative,
+# deliberately deferred here for the same reasons ADR-0014 chose a single-node cluster.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure_services" {
+  name             = "AllowAzureServices"
+  server_id        = azurerm_postgresql_flexible_server.this.id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
 }
