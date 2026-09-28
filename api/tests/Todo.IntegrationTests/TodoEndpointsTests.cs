@@ -31,18 +31,10 @@ public class TodoEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         });
     }
 
-    private async Task EnsureMigratedAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<TodoDbContext>();
-        await db.Database.MigrateAsync();
-    }
-
     [Fact]
     public async Task Create_then_list_returns_the_created_todo()
     {
-        await EnsureMigratedAsync();
-        var client = _factory.CreateClient();
+        var client = await _factory.NewRegisteredClientAsync();
 
         var create = await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "Trim the hedges", new LocationDto("42 Example St", null, null)));
@@ -56,8 +48,7 @@ public class TodoEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task List_respects_pagination_and_reports_total_count()
     {
-        await EnsureMigratedAsync();
-        var client = _factory.CreateClient();
+        var client = await _factory.NewRegisteredClientAsync();
 
         for (var i = 0; i < 5; i++)
         {
@@ -74,8 +65,7 @@ public class TodoEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Create_with_missing_title_returns_400()
     {
-        await EnsureMigratedAsync();
-        var client = _factory.CreateClient();
+        var client = await _factory.NewRegisteredClientAsync();
 
         var response = await client.PostAsJsonAsync("/todos", new CreateTodoRequest(
             "", new LocationDto("Some address", null, null)));

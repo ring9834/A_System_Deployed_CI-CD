@@ -35,6 +35,7 @@ export function TodoForm() {
             onChange={(e) => setTitle(e.target.value)}
             required
             placeholder="Trim the front hedges"
+            maxLength={200}
             className="mt-1 block w-full rounded-md border border-ink/15 bg-white px-3 py-2.5 text-ink placeholder:text-ink/40 focus:border-moss-600 focus:outline-none focus:ring-2 focus:ring-moss-600/40"
           />
         </div>
@@ -49,6 +50,7 @@ export function TodoForm() {
             onChange={(e) => setAddress(e.target.value)}
             required
             placeholder="42 Example St"
+            maxLength={500}
             className="mt-1 block w-full rounded-md border border-ink/15 bg-white px-3 py-2.5 text-ink placeholder:text-ink/40 focus:border-moss-600 focus:outline-none focus:ring-2 focus:ring-moss-600/40"
           />
         </div>

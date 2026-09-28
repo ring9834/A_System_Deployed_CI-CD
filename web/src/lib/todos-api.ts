@@ -104,3 +104,7 @@ export async function login(username: string, password: string): Promise<void> {
     throw new Error(problem?.detail ?? `Login failed: ${res.status}`);
   }
 }
+
+export async function logout(): Promise<void> {
+  await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+}

@@ -56,6 +56,12 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ProblemDetails' }
 
+  /auth/logout:
+    post:
+      summary: Clear the session cookie
+      responses:
+        '204': { description: Logged out }
+
   /todos:
     get:
       summary: List the caller's todos, paginated and optionally filtered by state (Q3)
