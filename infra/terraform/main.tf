@@ -33,6 +33,16 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
 
   identity { type = "SystemAssigned" }
+
+  # Azure returns default upgrade_settings values (drain_timeout_in_minutes, max_surge, etc.)
+  # that weren't explicitly set here, which every plan then tries to "correct" back to null —
+  # a real, recurring problem: it blocked a targeted apply on ANY other resource whenever the
+  # cluster was stopped, since -target pulls in the kubernetes provider's dependency
+  # (this cluster) and Terraform then tries to reconcile this drift too. Ignored explicitly
+  # rather than fought repeatedly — Azure's defaults here are fine as-is.
+  lifecycle {
+    ignore_changes = [default_node_pool[0].upgrade_settings]
+  }
 }
 
 resource "azurerm_role_assignment" "aks_pull" {
@@ -102,10 +112,33 @@ resource "kubernetes_secret" "todo_secrets" {
 # Vault Secrets Officer" rather than the read-only "Key Vault Secrets User", since this same
 # identity is also the one running `az keyvault secret set` manually to seed values. Known
 # limitation: this only covers whichever identity applies most recently; if BOTH your local
-# user and CI need independent, persistent access, add a second explicit role assignment
-# naming the other identity's object ID rather than relying on this dynamic one to cover both.
-resource "azurerm_role_assignment" "terraform_keyvault_reader" {
+# Split into two static, permanent grants instead of one dynamic one — the dynamic
+# `data.azurerm_client_config.current.object_id` only ever matched whoever happened to run
+# `apply` most recently, causing a destroy-then-recreate every time a DIFFERENT identity ran
+# it next (confirmed via a real 403: CI's service principal genuinely never had Key Vault
+# access, since every prior grant/import today was done under the local user's own login).
+resource "azurerm_role_assignment" "local_user_keyvault_officer" {
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = "ead30023-201f-42a5-9e39-f9bc01d812fb" # local user — for manual az keyvault secret set
+}
+
+resource "azurerm_role_assignment" "ci_keyvault_reader" {
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets User"               # read-only — CI only ever reads secrets, never sets them
+  principal_id         = "2490b713-81fd-4fa8-97c7-d2b16d7ee5e7" # CI service principal
+}
+
+# Fixes a real connectivity gap: the Postgres Flexible Server ships with zero firewall
+# rules by default, meaning NOTHING can reach it until explicitly allowed — confirmed via a
+# real Npgsql connection timeout from a running pod, not assumed. start=0.0.0.0/end=0.0.0.0
+# is Azure's documented special value meaning "allow any Azure-internal service", not a
+# literal open-to-the-internet rule. This is the pragmatic choice for AKS-without-VNet-
+# integration; a VNet-integrated setup (private access) would be the more secure alternative,
+# deliberately deferred here for the same reasons ADR-0014 chose a single-node cluster.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure_services" {
+  name             = "AllowAzureServices"
+  server_id        = azurerm_postgresql_flexible_server.this.id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
 }

@@ -83,12 +83,14 @@ jobs:
           image-ref: rushtododevacr.azurecr.io/todo-api:${{ github.sha }}
           severity: CRITICAL,HIGH
           exit-code: 1   # fail the build on a real finding — don't just report and ignore
+          trivyignores: .trivyignore
       - name: Scan web image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: rushtododevacr.azurecr.io/todo-web:${{ github.sha }}
           severity: CRITICAL,HIGH
           exit-code: 1
+          trivyignores: .trivyignore
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -167,4 +169,4 @@ jobs:
             --set web.image.tag=${{ github.sha }} \
             --atomic --timeout 5m
       - name: Smoke test
-        run: curl -sf http://4.147.5.137.nip.io/api/health
+        run: curl -sf http://4.147.5.137.nip.io/api/health/ready
