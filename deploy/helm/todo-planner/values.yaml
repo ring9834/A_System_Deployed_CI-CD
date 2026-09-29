@@ -1,6 +1,6 @@
 api:
   image:
-    repository: REPLACE_WITH_ACR.azurecr.io/todo-api
+    repository: rushtododevacr.azurecr.io/todo-api
     tag: latest
   port: 8080
   resources:
@@ -9,7 +9,7 @@ api:
 
 web:
   image:
-    repository: REPLACE_WITH_ACR.azurecr.io/todo-web
+    repository: rushtododevacr.azurecr.io/todo-web
     tag: latest
   port: 3000
   resources:
@@ -17,7 +17,7 @@ web:
     limits: { memory: 256Mi }
 
 ingress:
-  host: REPLACE_WITH_HOSTNAME  # e.g. todo.<your-dev-ip>.nip.io for a free dev hostname
+  host: 4.147.5.137.nip.io  # e.g. todo.<your-dev-ip>.nip.io for a free dev hostname
 
 # Must match the name Terraform's kubernetes_secret.todo_secrets resource creates
 # (infra/terraform/main.tf) exactly — Helm only references this Secret by name, it never
