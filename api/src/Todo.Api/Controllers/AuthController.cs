@@ -59,7 +59,9 @@ public class AuthController : ControllerBase
         Response.Cookies.Delete(Program.AuthCookieName, new CookieOptions
         {
             HttpOnly = true,
-            Secure = !_env.IsDevelopment(),
+            // Secure ONLY in a genuine production environment with real TLS, not just "not
+            // Development" — see IssueSessionCookie below for the full explanation.
+            Secure = _env.IsProduction(),
             SameSite = SameSiteMode.Lax,
         });
         return NoContent();
@@ -96,7 +98,16 @@ public class AuthController : ControllerBase
             // by the client over a non-HTTPS connection (confirmed by OwnerIsolationTests
             // failing with every authenticated request looking anonymous). Environment-
             // conditional, same pattern as the Development-only auto-migrate.
-            Secure = !_env.IsDevelopment(),
+            //
+            // Secure ONLY in a genuine production environment with real TLS — not simply
+            // "not Development". This deployed AKS "dev" tier runs ASPNETCORE_ENVIRONMENT=
+            // Staging specifically so it falls into neither IsDevelopment() nor
+            // IsProduction(), matching reality: a real deployed environment (unlike local
+            // dev) with no TLS configured yet (unlike a genuine production environment).
+            // Confirmed necessary via a real bug: login appeared to work (client-side
+            // state only), but every subsequent API call silently came back 401 — the
+            // Secure-flagged cookie was never sent back over this ingress's plain HTTP.
+            Secure = _env.IsProduction(),
             SameSite = SameSiteMode.Lax,
             Expires = DateTimeOffset.UtcNow.AddHours(8),
         });
