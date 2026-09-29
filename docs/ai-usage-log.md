@@ -1,29 +1,114 @@
-# AI usage log
+# AI Usage Log — RUSH Todo Planner
 
-Short, honest, written as I go. Purpose: show what AI did, what I changed, and how I verified it.
+Tool used throughout: Claude (web chat). This log covers the full SDLC — requirements through
+production deployment — with particular depth on the real-deployment debugging session, since
+that's where the most substantial AI-assisted diagnosis and self-correction happened.
 
-## Entries
-| Date | Task | Tool | What AI produced | What I changed / rejected | How I verified |
-|---|---|---|---|---|---|
-| 2026-09-22 | Draft Step 1 requirements (assumptions log, backlog cut line, quality scenarios) from the RUSH brief | Claude (web chat) | Full first draft of `docs/requirements.md`: 7 assumptions (A1-A7), backlog split into Built/Deferred/Out-of-scope, 6 quality scenarios (Q1-Q6) with priority and verification method | Kept structure and most content; reviewed each assumption against the brief myself before accepting | Re-read the brief against each assumption row; checked each scenario names a test I can actually build later |
-| 2026-09-22 | Add caching (Redis) to Deferred backlog and a scalability quality scenario | Claude (web chat) | I proposed the addition myself with reasoning; asked AI to add it as Q7 at priority M/M | AI pushed back on my M/M rating: separated the architecture decision (stateless API — cheap now, expensive to retrofit) from the implementation (Redis — correctly deferred), re-rated Q7 as H/L | Checked the logic against my own understanding of stateless design; confirmed the decision belongs in Step 2 as an ADR |
-| 2026-09-22 | Step 2 first pass: architecture (ADD-lite drivers/decisions, C4 diagram, ATAM-lite risk table) and 5 ADRs | Claude (web chat) | `docs/architecture.md` (drivers, C4 context/container diagrams, decisions table, ATAM-lite table) and ADR-0001 (modular monolith), 0002 (stateless API + JWT cookie transport), 0003 (domain layering), 0004 (database + migrations), 0005 (secrets) | Accepted the overall ADD/ATAM structure; had not yet questioned whether my stack preferences (.NET, React, Azure, PostgreSQL, JWT) were justified or just assumed | Checked each ADR resolves back to a named Q1-Q7 scenario; corrected AI's suggestion of SQL Server `rowversion` for concurrency — flagged it as wrong for PostgreSQL (should be Npgsql `xmin`), AI acknowledged and fixed it |
-| 2026-09-22 | Step 2, redone: pushed back that my stack choices (.NET, React, Azure, PostgreSQL, JWT) were preferences, not justified decisions; asked AI to treat them as open and compare real alternatives, plus decide API gateway, async processing, and caching as explicit architecture questions | Claude (web chat) | 6 new ADRs — 0006 (stack selection vs brief's other allowed options), 0007 (JWT vs Basic Auth vs sessions vs OIDC, separated from ADR-0002's transport decision), 0008 (PostgreSQL vs Azure SQL vs CosmosDB), 0009 (plain ingress vs Application Gateway vs APIM — APIM rejected, not deferred), 0010 (no message queue for MVP, with an explicit trigger for revisiting), 0011 (no cache for MVP, Redis if triggered). Updated `architecture.md` drivers to separate brief-mandated constraints from my chosen/justified stack, and added a security-priority sensitivity point (S3) to the ATAM-lite table | Drove the requirement that every personal stack choice get a real alternatives comparison, not just a stated preference; accepted AI's reasoning throughout (e.g. rejecting APIM as genuinely over-engineered, not merely deferred) | Cross-checked each new ADR's "rejected" option against whether it solved a problem this project actually has; confirmed the APIM rejection logic against the single-frontend, single-backend reality of the app |
-| 2026-09-22 | Asked whether front-end rendering strategy, Next.js choice, state management (Redux), and front-end caching were architecturally significant or just implementation detail | Claude (web chat) | ADR-0012 (CSR via Next.js, no SSR — SSR would conflict with the cookie-based auth transport in ADR-0002) and ADR-0013 (TanStack Query for server state, React state/Context for UI state, no Redux); clarified that front-end data caching is resolved by ADR-0013 and static asset caching is a Step 6 deployment concern, not a Step 2 ADR | Accepted both ADRs; the SSR-vs-auth conflict AI identified was not something I had considered before asking the question | Confirmed the SSR/cookie conflict is real (a Next.js server rendering an authenticated page would need to read and forward the cookie itself, contradicting ADR-0002's browser-only design) |
-| 2026-09-22 | Asked AI to audit ADR-0001 through 0013 for items needing touch-up after the additions above, and whether any should be merged | Claude (web chat) | Audit table identifying two real issues (ADR-0002 and ADR-0004 each assume a decision — JWT, PostgreSQL — that a later-numbered ADR, 0007 and 0008, actually justifies) and two minor cross-reference gaps (0006/0012, 0011/0013). Concluded no merges were warranted — each pair answers a genuinely distinct question. Added four "Related ADRs" notes and a reading-order map to `architecture.md`, without renumbering | Accepted the no-merge conclusion and the decision not to renumber (renumbering would invalidate ADR numbers already referenced throughout this conversation) | Read each "Related ADRs" note in context to confirm it resolves the ordering issue without duplicating content |
-| 2026-09-22 | Asked whether A6 and two backlog lines in `requirements.md` (naming "JWT" directly) belonged in Step 1 at all, given ADR-0007 was the actual place the mechanism gets decided | Claude (web chat) | Identified this as a real methodological leak — Step 1 had pre-committed to JWT before Step 2's alternatives comparison existed. Reworded A6 to state only the open scope question (is a full IdP in scope), reworded the two backlog lines to describe the capability ("owner-scoped access control") instead of the mechanism, and updated ADR-0007's context line to match | Caught the issue myself by re-reading Step 1 against the Step 1/Step 2 separation principle; accepted AI's proposed wording and its audit confirming Redis (caching backlog) and `xmin` (Q6) did *not* have the same problem, since neither pre-empted a real Step 2 alternatives debate | Re-read `requirements.md` end to end after the edit to confirm no other technology names were asserted as decisions ahead of their justifying ADR |
+## Requirements → Design → Architecture (Steps 1–3)
 
-## Rejected or corrected suggestions
-| Date | Suggestion | Why I rejected or corrected it |
-|---|---|---|
-| 2026-09-22 | AI's first pass on Q7 (my own initial M/M rating) | Accepted AI's counter-argument instead: priority should reflect cost of reversal (high), not implementation risk (low) — rated H/L, not M/M |
-| 2026-09-22 | AI's first draft of ADR-0004 used SQL Server's `rowversion` for optimistic concurrency | Wrong for PostgreSQL — corrected to Npgsql's `xmin` system column, which is the PostgreSQL-native equivalent |
-| 2026-09-22 | AI's original Step 2 draft treated .NET/React/Azure/PostgreSQL/JWT as fixed constraints, not decisions | Rejected the framing — pushed back that these were my preferences, not brief-mandated, and required AI to produce real alternatives comparisons for each (led to ADRs 0006-0011) |
-| 2026-09-22 | Original `requirements.md` A6 and backlog wording named "JWT" as the decided mechanism | Rejected as a Step 1/Step 2 boundary violation — Step 1 should record open questions, not pre-decide what Step 2's ADR-0007 was supposed to compare and justify |
+**Generated:** requirements.md (assumptions, backlog, quality scenarios), architecture.md
+(24 ADRs, ATAM-lite), design.md (state machine, ERD, STRIDE), openapi.yaml.
 
-## Principles I follow
-- Spec and acceptance criteria before prompting; small increments; review every diff.
-- AI drafts tests, boilerplate and IaC; I verify IaC with `terraform validate`/`plan` and `helm lint`/`template`.
-- I only keep code I can explain and modify without AI.
-- When I disagree with AI's reasoning (or it disagrees with mine), I record which way it went and why.
-- Requirements (Step 1) and architecture (Step 2) stay separated: Step 1 states what's open, Step 2 decides how — checked explicitly, not assumed.
+**Verified:** Every ADR's alternatives were checked against the actual constraints of the
+assessment brief before accepting AI's recommendation, not accepted wholesale.
+
+## Step 4 — Walking skeleton
+
+**Generated:** Dockerfiles, Terraform (AKS/ACR/Postgres/Key Vault), Helm chart skeleton,
+GitHub Actions CI/CD with OIDC.
+
+**Real bugs found and fixed, not assumed correct:**
+- Missing `.dockerignore` — Windows host `bin/obj` paths corrupted the Linux build context
+- `.NET 10` generates `.slnx` by default; Dockerfile assumed `.sln`
+- AKS node SKU rejected twice (B-series disallowed for system pools; then not in the
+  subscription's allowed list) — fixed via `az postgres flexible-server list-skus`/AKS
+  equivalent checks, not guessed
+- CI: `azure/login` + Terraform combination was fundamentally wrong (`azurerm` provider
+  rejects Service-Principal CLI sessions) — corrected to `ARM_USE_OIDC` + job-level env vars
+- CI: a skip-cascade bug where `deploy-dev` was silently skipped whenever `terraform` was
+  path-filtered out, even on a fully valid deploy
+
+## Slices 0–5 — Vertical feature development
+
+**Generated:** TDD-driven state machine, CRUD endpoints, optimistic concurrency via `xmin`,
+JWT auth, frontend components with real component tests run in a sandboxed environment.
+
+**Real bugs found through actual verification, not just code review:**
+- A case-sensitivity contract violation (`ToString()` returning PascalCase against a
+  lowercase-documented API) — found because the UI silently broke, not because a test caught it
+- .NET `HttpClient` rejecting an unquoted `If-Match` header per RFC 7232
+- A stale test assertion, correct when written, made stale by an unrelated fix landing after it
+- **Four sequential, independently-diagnosed auth bugs in one slice**: a genuinely missing
+  endpoint, ASP.NET Core middleware ordering breaking `[Authorize]` entirely, a cookie
+  `Secure` flag silently dropped over plain HTTP, and JWT claim remapping (`MapInboundClaims`)
+  — each only became visible once the previous one was fixed
+
+## Step 6 — Production hardening
+
+**Generated:** replica/PDB config, deepened health checks, ConfigMap/Secret split, CI security
+scanning additions.
+
+**Two things caught and corrected before they shipped, not after:**
+- A self-introduced Terraform/Helm ownership conflict (both trying to manage the same K8s
+  Secret) — caught and fixed before ever being applied
+- A Trivy Action version recommended by AI fell inside a range confirmed compromised in a
+  real, documented supply-chain attack — caught by searching the actual advisory, not assumed
+  safe because the version number looked plausible
+
+## The real-deployment debugging session (this session)
+
+This is the single richest debugging arc in the project — roughly 40 back-and-forth turns,
+resolving issues across five genuinely distinct layers, each only visible once the layer
+before it was fixed:
+
+1. **Key Vault RBAC was silently in the legacy access-policy model** — `enable_rbac_authorization`
+   was never set; every earlier "successful" role grant had done nothing at all, confirmed
+   via a real 403.
+2. **Wrong identity granted the role** — an App ID was used where a Service Principal Object
+   ID was required; RBAC role assignments for a federated-credential-only identity must
+   target the SP object, not the app registration.
+3. **The Terraform backend defaulted to storage-account-key auth**, requiring a broad
+   `listKeys` permission — fixed structurally with `use_azuread_auth = true` rather than
+   granting yet another permission.
+4. **Local `terraform state list` returned empty** — traced to a real, latent mismatch in
+   `versions.tf`'s backend `key` and `resource_group_name`, silently pointing at an empty
+   181-byte state file while the real, populated 47KB state sat under a different key the
+   whole time. Recovered by correcting both values and re-initializing — nothing was
+   actually lost.
+5. **A single dynamic `principal_id = data.azurerm_client_config.current.object_id`** was
+   trying to represent two different identities (the local user, CI's service principal),
+   causing destroy/recreate churn every time a different identity ran `apply` — split into
+   two static, permanent grants.
+6. **Three separate OIDC federated-credential trust subjects needed**, discovered one at a
+   time as each CI job (`terraform`'s PR-triggered runs, `pull_request` events specifically,
+   and `deploy-dev`'s `environment: dev`) exercised a code path the others hadn't yet.
+7. **An ingress `rewrite-target` annotation, correct for the API path, silently broke every
+   static asset on the web path** — invisible until the first real browser load of the
+   deployed frontend, since every prior check either hit the (correctly-configured) API path
+   or the homepage document (which coincidentally "worked" even when misrouted).
+8. **Postgres shipped with zero firewall rules by default** — the actual root cause behind a
+   `todo-api` pod stuck failing its readiness probe; confirmed via a real Npgsql connection
+   timeout in the pod's own logs, not assumed.
+9. **No migration mechanism had ever actually run against the real database** — ADR-0004's
+   Helm pre-upgrade hook was decided at design time but never built; closed properly this
+   session with a `--migrate` mode reusing the existing runtime image (no second SDK-based
+   image needed) plus a real `helm.sh/hook: pre-upgrade` Job.
+10. **The session cookie's `Secure` flag was correct for local/test HTTP but wrong for the
+    real deployed "dev" tier** — `!IsDevelopment()` incorrectly treated a TLS-less AKS
+    environment as production-equivalent; fixed by introducing a genuine `Staging`
+    environment distinction and checking `IsProduction()` specifically. This is a case where
+    a risk was explicitly flagged in writing twice, in earlier PR descriptions, before it
+    was ever hit live — good evidence the earlier flagging was substantive, not boilerplate.
+
+**Two AI mistakes caught and corrected within this same session, worth naming honestly:**
+- A `trivy-action` version tag was missing its required `v` prefix (`0.36.0` vs `v0.36.0`),
+  causing the action to fail to resolve entirely — corrected after the real CI error.
+- A claim that `.trivyignore` is auto-detected by `aquasecurity/trivy-action` was wrong —
+  confirmed via multiple real GitHub issues that the action requires the file path passed
+  explicitly via a `trivyignores:` input; the underlying `trivy` CLI's own auto-detection
+  does not extend to this action wrapper.
+
+**Overall verification discipline maintained throughout:** every `terraform plan` was read
+before applying, every RBAC/OIDC error's exact identity and permission were checked against
+Azure directly (never assumed from memory), and every "should work now" claim was followed
+by an actual `kubectl`/browser check rather than trusting the fix on paper.
