@@ -15,3 +15,5 @@ TODO (Step 4): one command to run the whole stack locally with seed data.
 
 ## Testing
 TODO: short test strategy (unit, integration, contract, component) and how to run each.
+
+(https://photos.fife.usercontent.google.com/pw/AP1GczNd6Hv0_Wx62W7uHhPrjPMWrz3zOYvDsyZu6JNj-54KxG6ieXF0fWdd=w2559-h1398-s-no-gm?authuser=0)
